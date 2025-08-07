@@ -1,6 +1,6 @@
-"""MNIST example.
-
-Based on https://github.com/pytorch/examples/blob/master/mnist/main.py
+"""CIFAR 10 example
+ TODO do the same analysis with the datasets
+ TODO see how DEBA perform using this optimizer
 """
 
 from __future__ import print_function
