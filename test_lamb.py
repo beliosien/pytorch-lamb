@@ -10,7 +10,7 @@ import torch.nn as nn
 import torch.nn.functional as F
 import tqdm
 from tensorboardX import SummaryWriter
-from torchvision import datasets, transforms
+from torchvision import datasets, transforms, models
 from pytorch_lamb import Lamb, log_lamb_rs
 
 
