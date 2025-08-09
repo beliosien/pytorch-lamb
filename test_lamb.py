@@ -98,21 +98,22 @@ def main():
 
     kwargs = {'num_workers': 1, 'pin_memory': True} if use_cuda else {}
     train_loader = torch.utils.data.DataLoader(
-        datasets.MNIST('../data', train=True, download=True,
+        datasets.CIFAR10('../data', train=True, download=True,
                        transform=transforms.Compose([
                            transforms.ToTensor(),
                            transforms.Normalize((0.1307,), (0.3081,))
                        ])),
         batch_size=args.batch_size, shuffle=True, **kwargs)
     test_loader = torch.utils.data.DataLoader(
-        datasets.MNIST('../data', train=False, transform=transforms.Compose([
+        datasets.CIFAR10('../data', train=False, transform=transforms.Compose([
                            transforms.ToTensor(),
                            transforms.Normalize((0.1307,), (0.3081,))
                        ])),
         batch_size=args.test_batch_size, shuffle=True, **kwargs)
 
 
-    model = Net().to(device)
+    # model = Net().to(device)
+    model = models.resnet18(pretrained=False, num_classes=10).to(device)
     optimizer = Lamb(model.parameters(), lr=args.lr, weight_decay=args.wd, betas=(.9, .999), adam=(args.optimizer == 'adam'))
     writer = SummaryWriter()
     for epoch in range(1, args.epochs + 1):
