@@ -5,6 +5,7 @@
 
 from __future__ import print_function
 import argparse
+import time
 import torch
 import torch.nn as nn
 import torch.nn.functional as F
@@ -96,29 +97,37 @@ def main():
 
     device = torch.device("cuda" if use_cuda else "cpu")
 
-    kwargs = {'num_workers': 1, 'pin_memory': True} if use_cuda else {}
+    kwargs = {'num_workers': 2, 'pin_memory': True} if use_cuda else {}
     train_loader = torch.utils.data.DataLoader(
         datasets.CIFAR10('../data', train=True, download=True,
-                       transform=transforms.Compose([
-                           transforms.ToTensor(),
-                           transforms.Normalize((0.1307,), (0.3081,))
-                       ])),
+                       transform=transforms.Compose([ transforms.RandomCrop(32, padding=4),
+                                                     transforms.RandomHorizontalFlip(),
+                                                     transforms.ToTensor(),
+                                                     transforms.Normalize((0.4914, 0.4822, 0.4465), (0.2023, 0.1994, 0.2010)),
+                                                    ])),
         batch_size=args.batch_size, shuffle=True, **kwargs)
+    
     test_loader = torch.utils.data.DataLoader(
         datasets.CIFAR10('../data', train=False, transform=transforms.Compose([
-                           transforms.ToTensor(),
-                           transforms.Normalize((0.1307,), (0.3081,))
-                       ])),
+            transforms.ToTensor(),
+            transforms.Normalize((0.4914, 0.4822, 0.4465), (0.2023, 0.1994, 0.2010)),
+            ])),
         batch_size=args.test_batch_size, shuffle=True, **kwargs)
 
 
     # model = Net().to(device)
-    model = models.resnet18(pretrained=False, num_classes=10).to(device)
+    model = models.resnet50(pretrained=False, num_classes=10).to(device)
     optimizer = Lamb(model.parameters(), lr=args.lr, weight_decay=args.wd, betas=(.9, .999), adam=(args.optimizer == 'adam'))
     writer = SummaryWriter()
+    epoch_times = []
     for epoch in range(1, args.epochs + 1):
+        start = time.time()
         train(args, model, device, train_loader, optimizer, epoch, writer)
+        end = time.time()
+        epoch_times.append(end - start)
         test(args, model, device, test_loader, writer, epoch)
+    
+    print(f"Total training time: {sum(epoch_times):.2f} seconds")
 
  
 if __name__ == '__main__':
