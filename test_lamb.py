@@ -13,6 +13,7 @@ import tqdm
 from tensorboardX import SummaryWriter
 from torchvision import datasets, transforms, models
 from pytorch_lamb import Lamb, log_lamb_rs
+import numpy as np
 
 
 class Net(nn.Module):
@@ -69,6 +70,8 @@ def test(args, model, device, test_loader, event_writer:SummaryWriter, epoch):
     print('\nTest set: Average loss: {:.4f}, Accuracy: {}/{} ({:.0f}%)\n'.format(
         test_loss, correct, len(test_loader.dataset),
         100. * acc))
+    
+    return acc
 
 def main():
     # Training settings
@@ -89,7 +92,7 @@ def main():
                         help='random seed (default: 1)')
     parser.add_argument('--log-interval', type=int, default=10, metavar='N',
                         help='how many batches to wait before logging training status')
-    
+    parser.add_argument('--iterations', type=int, default=3, help='how many iterations to run')
     
     args = parser.parse_args()
     use_cuda = torch.cuda.is_available()
@@ -115,20 +118,36 @@ def main():
             ])),
         batch_size=args.test_batch_size, shuffle=True, **kwargs)
 
+    training_times = []
+    accuracies = []
 
-    # model = Net().to(device)
-    model = models.resnet50(pretrained=False, num_classes=10).to(device)
-    optimizer = Lamb(model.parameters(), lr=args.lr, weight_decay=args.wd, betas=(.9, .999), adam=(args.optimizer == 'adam'))
-    writer = SummaryWriter()
-    epoch_times = []
-    for epoch in range(1, args.epochs + 1):
-        start = time.time()
-        train(args, model, device, train_loader, optimizer, epoch, writer)
-        end = time.time()
-        epoch_times.append(end - start)
-        test(args, model, device, test_loader, writer, epoch)
+    # Run multiple iterations of training for statistical significance
+    for i in range(args.iterations):
+        # empty cache to avoid memory issues
+        torch.cuda.empty_cache()
+        print(f"Iteration {i+1}/{args.iterations}")
+
+        # Initialize model, optimizer, and writer
+        model = models.resnet50(pretrained=False, num_classes=10).to(device)
+        optimizer = Lamb(model.parameters(), lr=args.lr, weight_decay=args.wd, betas=(.9, .999), adam=(args.optimizer == 'adam'))
+        writer = SummaryWriter()
+        epoch_times = []
+        epoch_accuracies = []
+        for epoch in range(1, args.epochs + 1):
+            start = time.time()
+            train(args, model, device, train_loader, optimizer, epoch, writer)
+            end = time.time()
+            epoch_times.append(end - start)
+            acc = test(args, model, device, test_loader, writer, epoch)
+            epoch_accuracies.append(acc)
+        
+        training_times.append(sum(epoch_times))
+        accuracies.append(epoch_accuracies[-1])
+
     
-    print(f"Total training time: {sum(epoch_times):.2f} seconds")
+    print(f"Average training time over {args.iterations} runs: {np.mean(training_times):.2f} ± {np.std(training_times):.2f} seconds")
+    print(f"Average test accuracy over {args.iterations} runs: {np.mean(accuracies):.2f} ± {np.std(accuracies):.2f}%")
+    print(f"Best accuracy: {max(accuracies):.2f}%")
 
  
 if __name__ == '__main__':
